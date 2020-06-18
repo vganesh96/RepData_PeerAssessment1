@@ -1,0 +1,60 @@
+Reproducible Research Course Project 1
+======================================================================================================================================
+
+First we will read in the dataset and convert the columns into their valid format. 
+
+```{r}
+raw_data <- read.csv('activity.csv')
+raw_data$date <- as.Date(raw_data$date)
+raw_data$interval <- factor(raw_data$interval)
+```
+
+Create a new dataset which contains the information on the total steps taken in a day. We will then show a histogram with the frequency of the total number of steps taken daily.
+
+```{r message=FALSE, warning=FALSE, include=FALSE}
+library(dplyr)
+library(ggplot2)
+```
+
+```{r}
+daily_steps <- raw_data %>% group_by(date) %>% summarise(total_steps = sum(steps,na.rm = T))
+mean_steps <- mean(daily_steps$total_steps,na.rm = T)
+median_steps <- median(daily_steps$total_steps,na.rm = T)
+```
+
+The mean of the total number of steps taken in a day is `r mean_steps`, and the median is `r median_steps`.
+
+We will now take a took at the average steps taken per time interval:
+```{r}
+steps_by_interval <- na.omit(raw_data) %>% group_by(interval) %>% summarize(mean_steps = mean(steps))
+ggplot(data = steps_by_interval,aes(x = interval,y = mean_steps,group = 1))+geom_line()+scale_x_discrete(breaks = c(0,500,1000,1500,2000))+ggtitle('Average number of steps taken per time interval')
+```
+
+
+```{r}
+max_interval <- steps_by_interval[steps_by_interval$mean_steps == max(steps_by_interval$mean_steps),]$interval
+```
+
+The maximum number of steps are taken in the 5 minute interval starting in minute `r max_interval`
+
+```{r}
+number_of_NA <- nrow(raw_data[is.na(raw_data$steps),])
+print(paste0('There are ',number_of_NA,' missing values in the dataset.'))
+adjusted_data <- merge(raw_data,steps_by_interval,by = 'interval') %>% arrange(date,interval)
+adjusted_data[is.na(adjusted_data$steps),]$steps<- adjusted_data[is.na(adjusted_data$steps),]$mean_steps
+adjusted_daily_steps <- adjusted_data %>% group_by(date) %>% summarise(total_steps = sum(steps))
+adjusted_mean_steps <- mean(adjusted_daily_steps$total_steps,na.rm = T)
+adjusted_median_steps <- median(adjusted_daily_steps$total_steps,na.rm = T)
+ggplot(data = adjusted_daily_steps,aes(x = total_steps))+geom_histogram(breaks = c(0,5000,10000,15000,20000,25000),color = 'black',fill = 'grey' )+ggtitle('Frequency of total number of steps taken daily')
+
+```
+
+There are `number_of_NA` missing values in the dataset.
+
+```{r}
+adjusted_data$day <- ifelse(weekdays(adjusted_data$date) %in% c('Saturday','Sunday'),'weekend','weekday')
+adjusted_mean_steps_daily <- adjusted_data %>% group_by(interval,day) %>% summarize(mean_steps = mean(steps))
+ggplot(adjusted_mean_steps_daily,aes(x = as.numeric(interval),y = mean_steps,color = day))+facet_grid(day~.)+geom_line()+scale_x_discrete(breaks = c(0,500,1000,1500,2000))+xlab("Interval")+ylab("Mean Steps")
+```
+
+The weekend has many more intervals >150 steps than weekdays. The weekday however has a higher peak at over 200 steps.
